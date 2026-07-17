@@ -1,0 +1,16 @@
+name: codex_patch
+version: 0.5.0
+license: MPL2
+description: |
+  Crystal shard that implements the Codex patch format.
+
+authors:
+  - nogginly <nogginly@icloud.com>
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+
+targets:
+  apply_codex_patch:
+    main: src/cli/apply_codex_patch.cr
