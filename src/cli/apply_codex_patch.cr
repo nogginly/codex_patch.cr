@@ -19,7 +19,8 @@ patch_cwd = ARGV[1]? || Dir.current
 # working directory.
 File.open(patch_file, "r") do |patch_io|
   cwd = Dir.current
-  CodexPatch.apply(patch_io, patch_cwd) do |event|
+  policy = CodexPatch::DirAccessPolicy.new(cwd)
+  CodexPatch.apply(patch_io, policy, patch_cwd) do |event|
     case event
     when CodexPatch::SingleFileEvent
       file = Path.new(event[:file]).relative_to(cwd)

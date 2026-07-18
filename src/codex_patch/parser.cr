@@ -295,7 +295,7 @@ module CodexPatch
       return if parsed_hunk_headers?(trimmed)
       if line.starts_with?('+') && (content = line[1..]?) # Strip '+' prefix
         if hunk = @current_hunk
-          hunk.contents = (hunk.contents || "") + content + "\n"
+          hunk.contents = (hunk.contents || "") + content + EOL
         end
       else
         raise_invalid_hunk_header(trimmed)
@@ -309,7 +309,7 @@ module CodexPatch
       return if parsed_hunk_headers?(trimmed)
       if line.starts_with?('-') && (content = line[1..]?) # Strip '-' prefix
         if hunk = @current_hunk
-          hunk.contents = (hunk.contents || "") + content + "\n"
+          hunk.contents = (hunk.contents || "") + content + EOL
         end
       else
         raise_invalid_hunk_header(trimmed)

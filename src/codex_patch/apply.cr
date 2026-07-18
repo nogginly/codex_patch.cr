@@ -7,6 +7,23 @@ module CodexPatch
   class ApplyPatchError < Exception
   end
 
+  # An AccessPolicy allows CodexPatch to ensure it's allowed to perform
+  # operations on files.
+  module AccessPolicy
+    enum Op
+      Read
+      Write
+      Delete
+    end
+
+    # Return `true` if authorized `to` perform operation on `path`.
+    abstract def authorized?(path : String, to : Op) : Bool
+  end
+
+  # Error raised when checking with AccessPolicy fails
+  class AccessPolicyViolation < Exception
+  end
+
   # The type of file operation performed during patch application.
   enum ApplyAction
     # A new file was created.
@@ -31,8 +48,11 @@ module CodexPatch
   class ApplyPatch
     extend SeekSequence
 
-    # Creates a new ApplyPatch that will operate within the directory `cwd`.
-    def initialize(@cwd : String = Dir.current)
+    getter access_policy : AccessPolicy
+
+    # Creates a new ApplyPatch that will operate within the directory `cwd`
+    # and use the given access policy.
+    def initialize(@access_policy : AccessPolicy, @cwd : String = Dir.current)
     end
 
     # Parses the codex patch read from `patch_io` and applies each hunk
@@ -42,6 +62,11 @@ module CodexPatch
 
       hunks = parser.parse(patch_io)
       apply_hunks(hunks) { |event| yield event }
+    end
+
+    private def authorized?(path, to : AccessPolicy::Op) : Bool
+      return true if @access_policy.authorized?(path, to)
+      raise AccessPolicyViolation.new("Not authorized to <#{to}> path: #{path}")
     end
 
     # Iterates over `hunks` and dispatches each to the appropriate
@@ -69,6 +94,8 @@ module CodexPatch
     # and yields an {ApplyAction::AddedFile} event.
     private def apply_add_file(hunk : Hunk, & : ApplyEvent ->) : Nil
       path = resolve_path(hunk.path)
+      return unless authorized? path, to: AccessPolicy::Op::Write
+
       File.write(path, hunk.contents)
       yield({action: ApplyAction::AddedFile, file: path})
     end
@@ -77,6 +104,8 @@ module CodexPatch
     # and yields an {ApplyAction::DeletedFile} event.
     private def apply_delete_file(hunk : Hunk, & : ApplyEvent ->) : Nil
       path = resolve_path(hunk.path)
+      return unless authorized? path, to: AccessPolicy::Op::Delete
+
       File.delete(path)
       yield({action: ApplyAction::DeletedFile, file: path})
     end
@@ -89,11 +118,16 @@ module CodexPatch
     # is yielded only if the content actually changed.
     private def apply_update_file(hunk : Hunk, & : ApplyEvent ->) : Nil
       path = resolve_path(hunk.path)
+      return unless authorized? path, to: AccessPolicy::Op::Read
+
       original = File.read(path)
       new_content = compute_new_content(original, hunk.chunks)
 
       if move_path = hunk.move_path
         new_path = resolve_path(move_path)
+        return unless authorized? new_path, to: AccessPolicy::Op::Write
+        return unless authorized? path, to: AccessPolicy::Op::Delete
+
         File.write(new_path, new_content)
         File.delete(path)
         yield({action: ApplyAction::MovedFile, from: path, to: new_path})
@@ -102,6 +136,7 @@ module CodexPatch
         end
       else
         if original != new_content
+          return unless authorized? path, to: AccessPolicy::Op::Write
           File.write(path, new_content)
           yield({action: ApplyAction::UpdatedFile, file: path})
         end
@@ -117,7 +152,7 @@ module CodexPatch
     private def compute_new_content(original : String,
                                     chunks : Array(UpdateFileChunk)) : String
       # Split original content into lines
-      original_lines = original.split('\n').map(&.strip).to_a
+      original_lines = original.split(EOL).map(&.strip).to_a
 
       # Remove trailing empty line to match diff behaviour
       original_lines.pop if original_lines.last?.try(&.empty?)
@@ -130,7 +165,7 @@ module CodexPatch
       # Add trailing newline back if needed
       new_lines << "" unless new_lines.last?.try(&.empty?)
 
-      new_lines.join('\n')
+      new_lines.join(EOL)
     end
 
     # For each chunk, finds its location in `original_lines` using
@@ -177,7 +212,7 @@ module CodexPatch
           replacements << {start_idx, pattern.size, new_slice.clone}
           line_index = start_idx + pattern.size
         else
-          raise ApplyPatchError.new("Failed to find expected lines in file:\n#{chunk.old_lines.join('\n')}")
+          raise ApplyPatchError.new("Failed to find expected lines in file:#{EOL}#{chunk.old_lines.join(EOL)}")
         end
       end
 
