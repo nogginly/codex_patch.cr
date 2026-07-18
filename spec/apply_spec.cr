@@ -24,7 +24,8 @@ end
 
 def apply_patch_string(dir : String, patch : String) : Array(CodexPatch::ApplyEvent)
   evs = [] of CodexPatch::ApplyEvent
-  apply = CodexPatch::ApplyPatch.new(DirAccessPolicy.new(dir), dir)
+  policy = CodexPatch::DirAccessPolicy.new(dir)
+  apply = CodexPatch::ApplyPatch.new(policy, dir)
   apply.apply(IO::Memory.new(patch)) { |ev| evs << ev }
   evs
 end

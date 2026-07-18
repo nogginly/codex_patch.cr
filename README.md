@@ -24,6 +24,7 @@ abort("Specify patch file, or - to read from standard inpput.") if ARGV.size.zer
 patch_file = ARGV.first
 File.open(patch_file, "r") do |patch_io|
   cwd = Dir.current
+  policy = CodePatch::DirAccessPolicy.new(dir)
   CodexPatch.apply(patch_io, cwd) do |event|
     puts event.inspect
   end
