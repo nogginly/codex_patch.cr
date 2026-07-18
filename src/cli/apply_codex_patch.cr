@@ -1,5 +1,14 @@
 require "../codex_patch"
 
+# Allow all operations only on files within current directory
+private class CwdAccessPolicy
+  include CodexPatch::AccessPolicy
+
+  def authorized?(path : String, to : Op) : Bool
+    File.expand_path(path).starts_with?(Dir.current)
+  end
+end
+
 # Usage string for the CLI, which applies a codex patch file to a target directory.
 USAGE = <<-HELP
 apply_codex_patch PATCH_FILE [ TARGET_DIR ]
@@ -19,7 +28,7 @@ patch_cwd = ARGV[1]? || Dir.current
 # working directory.
 File.open(patch_file, "r") do |patch_io|
   cwd = Dir.current
-  CodexPatch.apply(patch_io, patch_cwd) do |event|
+  CodexPatch.apply(patch_io, CwdAccessPolicy.new, patch_cwd) do |event|
     case event
     when CodexPatch::SingleFileEvent
       file = Path.new(event[:file]).relative_to(cwd)

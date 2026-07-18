@@ -17,7 +17,7 @@ describe CodexPatch::Parser do
         hunks.size.should eq(1)
         hunks[0].type.should eq(CodexPatch::HunkType::AddFile)
         hunks[0].path.should eq("hello.txt")
-        hunks[0].contents.should eq("Hello world\n")
+        hunks[0].contents.should eq("Hello world#{EOL}")
       end
 
       it "parses Add File with multiple lines" do
@@ -34,7 +34,12 @@ describe CodexPatch::Parser do
         hunks = parser.parse(patch)
 
         hunks.size.should eq(1)
-        hunks[0].contents.should eq("line 1\nline 2\nline 3\n")
+        hunks[0].contents.should eq(<<-LINES)
+        line 1
+        line 2
+        line 3
+
+        LINES
       end
 
       it "parses Add File with paths containing subdirectories" do
@@ -78,7 +83,12 @@ describe CodexPatch::Parser do
         parser = CodexPatch::Parser.new
         hunks = parser.parse(patch)
 
-        hunks[0].contents.should eq("content1\ncontent2\ncontent3\n")
+        hunks[0].contents.should eq(<<-LINES)
+                                      content1
+                                      content2
+                                      content3
+
+                                      LINES
       end
 
       it "preserves content lines that start with + but include the rest" do
@@ -92,7 +102,7 @@ describe CodexPatch::Parser do
         parser = CodexPatch::Parser.new
         hunks = parser.parse(patch)
 
-        hunks[0].contents.should eq("+ not just single plus\n")
+        hunks[0].contents.should eq("+ not just single plus#{EOL}")
       end
 
       it "includes empty + lines as empty content lines" do
@@ -106,7 +116,7 @@ describe CodexPatch::Parser do
         parser = CodexPatch::Parser.new
         hunks = parser.parse(patch)
 
-        hunks[0].contents.should eq("\n")
+        hunks[0].contents.should eq(EOL)
       end
 
       it "trims whitespace from Add File path" do
@@ -453,8 +463,8 @@ describe CodexPatch::Parser do
         hunks = parser.parse(patch)
 
         hunks.size.should eq(2)
-        hunks[0].contents.should eq("first\n")
-        hunks[1].contents.should eq("second\n")
+        hunks[0].contents.should eq("first#{EOL}")
+        hunks[1].contents.should eq("second#{EOL}")
       end
 
       it "parses multiple Delete File hunks" do
@@ -518,7 +528,7 @@ describe CodexPatch::Parser do
 
         hunks.size.should eq(4)
         hunks[0].type.should eq(CodexPatch::HunkType::AddFile)
-        hunks[0].contents.should eq("new content\n")
+        hunks[0].contents.should eq("new content#{EOL}")
 
         hunks[1].type.should eq(CodexPatch::HunkType::DeleteFile)
         hunks[1].path.should eq("old.txt")
